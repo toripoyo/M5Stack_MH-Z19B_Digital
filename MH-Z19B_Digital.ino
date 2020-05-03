@@ -1,13 +1,16 @@
 #include <M5Stack.h>
 
-uint8_t readCommand[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
-uint8_t resetCommand[9] = {0xFF, 0x01, 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78};
-uint8_t response[9] = {};
-uint8_t pastData[320];
-float measuredPPM = 400;
+const uint8_t kCommandLen = 9;
+const uint8_t kResponseLen = 9;
+const uint8_t kReadCommand[kCommandLen] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+const uint8_t kResetCommand[kCommandLen] = {0xFF, 0x01, 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78};
 
+// BackGround Picture Data
 extern const unsigned short BGPicture[];
-void drawNowPPMData(uint16_t);
+
+// Function Define
+void drawPPMVal(uint16_t);
+void drawBlueScreen(String);
 
 void setup()
 {
@@ -15,84 +18,85 @@ void setup()
   Serial2.begin(9600);
   M5.Lcd.setTextColor(TFT_WHITE);
   M5.Lcd.setTextFont(4);
-  M5.Lcd.setTextSize(2);
+
+  // Calibration
+  M5.update();
+  if (M5.BtnB.isPressed())
+  {
+    Serial2.write(kResetCommand, kCommandLen);
+    drawBlueScreen("Resetting...");
+    delay(5000);
+    M5.Power.reset();
+  }
 }
 
 void loop()
 {
-  // Calibration
-  if (M5.BtnB.isPressed())
-  {
-    Serial2.write(resetCommand, 9);
-    M5.Lcd.fillScreen(TFT_BLUE);
-    M5.Lcd.setTextColor(TFT_WHITE);
-    M5.Lcd.drawString("Resetting...", 0, 0);
-    delay(5000);
-    M5.Power.reset();
-  }
-  else
-  {
-    Serial2.write(readCommand, 9);
-  }
-  Serial2.readBytes(response, 9);
+  uint8_t response[kResponseLen] = {};
 
+  // Read Current ppm
+  Serial2.write(kReadCommand, kCommandLen);
+  Serial2.readBytes(response, kResponseLen);
+
+  // resnponse is ok
   if (response[0] == 0xFF && response[1] == 0x86)
   {
-    measuredPPM = measuredPPM * 0.9 + ((256 * response[2]) + response[3]) * 0.1;
-    drawNowPPMData((uint16_t)measuredPPM);
+    uint16_t meas_PPM = (256 * response[2]) + response[3];
+    drawPPMVal(meas_PPM);
+    delay(1000);
   }
   else
   {
-    M5.Lcd.fillScreen(TFT_BLUE);
-    M5.Lcd.setTextColor(TFT_WHITE);
-    M5.Lcd.drawString("Invalid Response!", 0, 100);
-    delay(5000);
+    drawBlueScreen("Invalid Response!");
+    delay(3000);
     M5.Power.reset();
   }
-
-  M5.update();
-  delay(5000);
 }
 
-// Draw Process
-void drawNowPPMData(uint16_t ppm)
+// ---------------------------------------------------------------------
+
+// Draw Blue Screen
+void drawBlueScreen(String s)
 {
-  M5.Lcd.fillScreen(TFT_BLACK);
+  M5.Lcd.fillScreen(TFT_BLUE);
   M5.Lcd.setTextColor(TFT_WHITE);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.drawString("CO2 Meter", 0, 0);
-  M5.Lcd.drawString("ppm", 215, 80);
+  M5.Lcd.setTextSize(1);
+  M5.Lcd.drawString(s, 0, 100);
+}
 
-  if (ppm >= 1500)
-  {
-    M5.Lcd.setTextColor(TFT_RED);
-    M5.Lcd.drawString("Warning!", 10, 160);
-  }
-  else if (ppm >= 1000 && ppm < 1500)
-  {
-    M5.Lcd.setTextColor(TFT_ORANGE);
-  }
-  else if (ppm >= 500 && ppm < 1000)
-  {
-    M5.Lcd.setTextColor(TFT_GREEN);
-    M5.Lcd.drawString("Good", 10, 160);
-  }
-  else if (ppm < 500)
-  {
-    M5.Lcd.setTextColor(TFT_BLUE);
-    M5.Lcd.drawString("Good", 10, 160);
-  }
-  M5.Lcd.drawNumber(ppm, 0, 60, 6);
+// Draw Now Data
+void drawPPMVal(uint16_t ppm)
+{
+  const uint16_t x_offset = 40;
+  static uint16_t ppm_old = 0;
 
-  // Draw Graph
-  for (int i = 0; i < 319; i++)
+  if (ppm != ppm_old)
   {
-    pastData[i] = pastData[i + 1];
-  }
-  pastData[319] = (uint8_t)(ppm / 20);
+    ppm_old = ppm;
 
-  for (int i = 0; i < 320; i++)
-  {
-    M5.Lcd.drawPixel(i, 230 - pastData[i] + 20, WHITE);
+    M5.Lcd.setTextColor(TFT_WHITE);
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.drawString("CO2 Meter", 0, 0);
+    M5.Lcd.drawString("ppm", 215, 80);
+
+    if (ppm >= 1500)
+    {
+      M5.Lcd.setTextColor(TFT_RED);
+      M5.Lcd.drawString("Warning!", 10, 160);
+    }
+    else if (ppm >= 1000 && ppm < 1500)
+    {
+      M5.Lcd.setTextColor(TFT_ORANGE);
+    }
+    else if (ppm >= 500 && ppm < 1000)
+    {
+      M5.Lcd.setTextColor(TFT_GREEN);
+    }
+    else if (ppm < 500)
+    {
+      M5.Lcd.setTextColor(TFT_BLUE);
+    }
+    M5.Lcd.fillRect(0, 50, 180, 100, TFT_BLACK);
+    M5.Lcd.drawNumber(ppm, 0, 60, 6);
   }
 }
