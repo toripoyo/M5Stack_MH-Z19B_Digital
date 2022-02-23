@@ -75,14 +75,15 @@ void drawPPMVal(uint16_t ppm)
     ppm_old = ppm;
 
     M5.Lcd.setTextColor(TFT_WHITE);
-    M5.Lcd.setTextSize(2);
+    M5.Lcd.setTextSize(1);
     M5.Lcd.drawString("CO2 Meter", 0, 0);
-    M5.Lcd.drawString("ppm", 215, 80);
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.drawString("ppm", 220, 160);
 
     if (ppm >= 1500)
     {
       M5.Lcd.setTextColor(TFT_RED);
-      M5.Lcd.drawString("Warning!", 10, 160);
+      M5.Lcd.drawString("Warning!", 5, 160);
     }
     else if (ppm >= 1000 && ppm < 1500)
     {
@@ -96,7 +97,7 @@ void drawPPMVal(uint16_t ppm)
     {
       M5.Lcd.setTextColor(TFT_BLUE);
     }
-    M5.Lcd.fillRect(0, 50, 180, 100, TFT_BLACK);
-    M5.Lcd.drawNumber(ppm, 0, 60, 6);
+    M5.Lcd.fillRect(30, 50, 240, 100, TFT_BLACK);
+    M5.Lcd.drawNumber(ppm, 40, 60, 6);
   }
 }
